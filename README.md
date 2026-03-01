@@ -49,7 +49,7 @@ Vision 분야의 Dense Captioning 개념을 단백질에 적용:
 - Global caption → Hierarchical caption
 
 # Architecture
-
+![architecture](architecture.png)
 ## Inference Path
 
 ```
@@ -69,7 +69,7 @@ Final Function Description
 ```
 
 ## Training Path
-
+![train](training.png)
 1. Domain-level Prototype Regression
 2. Protein–Text Contrastive Alignment
 3. Instruction + Soft Prompting 기반 LLM Fine-tuning
@@ -84,6 +84,7 @@ Final Function Description
 - Domain Projector: MLP + GeLU
 - L2 Normalization
 
+<img src="regression.png" width="600"/>
 ### Prototype Regression
 
 - Many-to-One Regression
@@ -102,6 +103,7 @@ Final Function Description
 - Mean-level alignment
 - Distribution-level alignment
 
+<img src="contrastive.png" width="600"/>
 Loss:
 - Contrastive loss (mean + variance)
 
