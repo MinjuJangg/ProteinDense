@@ -6,175 +6,184 @@ ICBCB 2026 / Generative Genomics Workshop
 
 ## Overview
 
-ProteinDense는 단백질 기능 예측을 위해 기존의 sequence-level captioning을 확장한 **domain-aware dense captioning framework**입니다.
+ProteinDense는 단백질 기능 예측을 위한 **domain-aware dense captioning framework**
 
-기존 연구는 단백질 전체 서열을 하나의 벡터로 요약하여 기능을 예측했지만,  
-이 방식은 도메인 수준의 기능적 모듈성과 구조적 정보를 충분히 반영하지 못하는 한계가 있었습니다.
+기존 protein captioning 연구는 단백질 전체 서열을 하나의 벡터로 압축하여 기능을 생성했으며,  
+이로 인해 기능적 모듈성(domain-level modularity)을 반영하지 못하는 한계
 
-본 연구는 단백질을 여러 functional domain의 조합으로 분해하고,  
-각 도메인을 개별적으로 설명한 뒤 이를 통합하여 단백질 전체 기능을 생성하는 구조적 접근을 제안합니다.
+본 연구는 단백질을
 
-> Sequence → Domain → Protein → Function
+> **Sequence → Domain → Protein → Function**
 
----
+구조로 재해석하고,  
+도메인 단위에서 먼저 의미를 학습한 후 이를 통합하는 **계층적 생성 모델**을 제안
+
 
 ## Motivation
 
-### Limitations of Previous Protein Captioning
+### Experimental & Computational Gap
 
-- 단백질 전체를 하나의 벡터로 요약 → 정보 손실
-- 도메인 구조 반영 부족
-- 복잡 기능 설명에 한계
-- Protein ↔ Text 간 modality gap 존재
+- NGS 발전으로 단백질 서열 데이터는 폭증
+- 실제 wet-lab 기능 검증은 비용이 높고 느림
+- 전체 단백질 중 1% 미만만 실험적으로 기능이 확인됨
 
-### Key Question
+→ 자동화된 protein function captioning 필요
 
-> 단백질을 하나의 서열이 아니라  
-> 여러 기능 도메인의 조합으로 모델링하면  
-> 기능 예측 성능과 해석 가능성을 개선할 수 있는가?
+## Limitations of Previous Work
 
----
+기존 연구의 공통 한계:
 
-## Core Idea
+- 단백질–텍스트 modality gap 감소에 집중
+- sequence-level representation만 사용 (한개의 벡터로 압축)
+- domain-level modular reasoning 부재
+- 복합 기능 설명 시 정보 손실 발생
 
-### Dense Captioning (Vision)
-이미지를 여러 region으로 나누어 각각 설명
+## Key Idea
 
-### ProteinDense
-단백질을 여러 domain으로 분해하여 각각 설명하고, 이를 통합하여 전체 기능을 생성
+> 단백질 기능을 한 문장으로 생성하기 전에,  
+> 각 **Domain을 먼저 설명(Dense Captioning)** 하고 이를 통합
 
-- Domain-level semantic modeling
-- Prototype Regression 기반 alignment
-- Domain caption을 LLM에 auxiliary input으로 주입
-- Hierarchical caption fusion 구조
+Vision 분야의 Dense Captioning 개념을 단백질에 적용:
 
----
+- Region-level → Domain-level
+- Global caption → Hierarchical caption
 
-## Architecture
+# Architecture
 
-### 1. Domain Captioner
+## Inference Path
 
-**Input**
-- Protein sequence
-- InterProScan 기반 domain segmentation
+```
+Protein Sequence
+↓
+InterProScan
+↓
+Domain Extraction
+↓
+Domain Embedder (ESM2-3B)
+↓
+Domain Captioner (LLAMA + LoRA)
+↓
+Protein Captioner (Fusion LLM)
+↓
+Final Function Description
+```
 
-**Components**
-- Protein Encoder: `ESM2–3B` (frozen)
-- Domain Projector: `MLP + L2 Normalization`
-- Prototype Regression (Many-to-One)
-- LLaMA-based Domain Captioner (LoRA fine-tuning)
+## Training Path
 
-**Training Strategy**
-- 여러 sequence variant → 하나의 기능 prototype으로 수렴
-- Cosine similarity loss 기반 semantic alignment
+1. Domain-level Prototype Regression
+2. Protein–Text Contrastive Alignment
+3. Instruction + Soft Prompting 기반 LLM Fine-tuning
+4. LoRA 적용
 
----
 
-### 2. Protein Captioner (Fusion Captioner)
+## Part 1. Domain Captioner
 
-**Role**
-- Domain caption + Protein embedding 통합
-- 최종 protein-level function description 생성
+### Domain Feature Extractor
 
-**Techniques**
-- Contrastive Learning (Mean + Std pooling)
-- Protein–Text alignment
-- Instruction + Soft Prompting
-- LoRA-based LLM fine-tuning
+- Protein Encoder: **ESM2-3B (Frozen)**
+- Domain Projector: MLP + GeLU
+- L2 Normalization
 
----
+### Prototype Regression
+
+- Many-to-One Regression
+- 여러 sequence variant → 하나의 functional prototype
+- Loss: Cosine Similarity
+
+→ Domain semantic space 정렬
+
+
+## Part 2. Protein Captioner
+
+### Protein–Text Contrastive Alignment
+
+- Protein: Mean / Std pooling
+- Text: LLaMA intermediate layer pooling
+- Mean-level alignment
+- Distribution-level alignment
+
+Loss:
+- Contrastive loss (mean + variance)
+
+## Part 3 & 4. LLM-Tuning
+
+- Domain Captioner(LLAMA3-8B) Fine-Tuning(Lora)
+- Fusion Captioner(LLAMA3-8B) Fine-Tuning(Lora)
+
 
 ## Dataset
 
-### Protein-Level
-- UniProtKB / Swiss-Prot
-- 약 20K protein subset
+### Protein-Level Dataset
 
-### Domain-Level
-- InterPro database
+- UniProtKB / Swiss-Prot
+- Total: 241,850 (Filtered)
+
+### Domain-Level Dataset
+
+- InterPro
+- 20K protein subset
 - 25,854 domain instances
 - 7,230 unique domain types
 
-### Final Split
 
-| Split | Count |
-|-------|-------|
-| Train | 234,179 |
-| Eval  | 3,840 |
-| Test  | 3,831 |
-| **Total** | **241,850** |
-
----
-
-## Evaluation Metrics
-
-- Exact Match
-- BLEU-2 / BLEU-4
-- ROUGE-1 / ROUGE-2 / ROUGE-L
-- BERTScore (RoBERTa)
-- BERTScore (BioBERT)
-
----
 
 ## Results
 
-### Protein Captioning Performance
+### Protein Captioner
 
-| Model | Exact | BLEU-4 | ROUGE-L | BioBERTScore |
-|-------|--------|--------|----------|--------------|
-| Baseline (Prot2Text) | 10.3 | 14.5 | 23.8 | 76.0 |
-| Ours (Generated Domain) | 14.4 | 20.4 | 30.3 | 79.8 |
-| Ours (GT Domain) | 18.5 | 26.3 | 40.1 | 84.0 |
+| Method | Exact | BLEU-2 | ROUGE-L | BioBERT |
+|--------|-------|--------|---------|---------|
+| Baseline (Prot2Text) | 10.3 | 17.3 | 23.8 | 76.0 |
+| Ours (Generated Domain) | 14.4 | 24.6 | 30.3 | 79.8 |
+| Ours (GT Domain) | 18.5 | 31.9 | 40.1 | 84.0 |
 
-Domain information consistently improves performance over baseline.
+→ Domain 정보가 일관된 성능 향상 유도
 
----
 
-## Ablation Study
+### Domain Captioner Strategy
 
-| Domain Caption | Exact | BLEU-4 |
-|---------------|-------|--------|
-| None | 10.3 | 14.5 |
-| Generated | 14.4 | 20.4 |
-| GT | 18.5 | 26.3 |
-| Random | 3.0 | 5.7 |
+| Strategy | Exact | BLEU-4 | ROUGE-L |
+|-----------|-------|--------|---------|
+| Contrastive | 1.0 | 4.7 | 16.5 |
+| Prototype Regression | 5.8 | 11.4 | 21.0 |
 
-Domain caption quality directly impacts prediction performance.
+→ Prototype Regression이 가장 효과적
 
----
 
 ## Qualitative Analysis
 
-**Case 1 – Mechanism Correction**  
-Hydrolysis → Phosphorylation correct recovery via domain hint
+#### Case 1 – Mechanism Correction
+Baseline: Hydrolysis  
+Ours: Phosphorylation (Correct enzymatic mechanism)
 
-**Case 2 – Functional Direction Correction**  
-Activator → Repressor 방향성 복원
+#### Case 2 – Functional Direction Correction
+Baseline: Activator  
+Ours: Repressor (Correct direction recovered)
 
-**Case 3 – Hallucination Mitigation**  
-잘못된 motor protein 예측 → 정확한 complex membership 복원
+#### Case 3 – Hallucination Mitigation
+Baseline: Motor protein hallucination  
+Ours: Correct exocyst complex membership
 
----
+## Domain ↔ Caption Alignment
 
-## Contributions
+Prototype Regression 사용 시
 
-- Domain-aware dense captioning framework 제안
-- Prototype Regression 기반 semantic alignment
-- Domain-to-Protein hierarchical fusion 구조 설계
-- Domain 품질과 예측 성능 간 통계적 상관성 검증
-- Hallucination 감소 및 기능 방향성 오류 완화
+- Intra similarity 증가
+- Inter similarity 감소
+- Alignment Gap 최대화
 
----
+→ Domain semantic alignment 개선
+
 
 ## Conclusion
 
-ProteinDense는 단백질 기능 예측을  
-sequence-level captioning에서  
-domain-aware dense captioning으로 확장한 구조적 접근입니다.
+ProteinDense는
 
-Domain 정보를 보조 입력으로 활용함으로써:
+- Domain-level modeling
+- Prototype Regression 기반 정렬
+- Hierarchical caption generation
 
-- 성능을 일관되게 향상
-- 기능 방향성 오류 감소
-- hallucination 완화
-- 복잡 기능 설명에 대한 표현력 강화
+을 통해 기존 sequence-level 접근 대비  
+일관된 성능 향상을 달성
+
+Domain quality가 높을수록 prediction 성능이 단계적으로 향상됨을 확인
