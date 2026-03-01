@@ -84,7 +84,7 @@ Final Function Description
 - Domain Projector: MLP + GeLU
 - L2 Normalization
 
-<img src="regression.png" width="600"/>
+<img src="regression.png" width="300"/>
 ### Prototype Regression
 
 - Many-to-One Regression
@@ -103,7 +103,7 @@ Final Function Description
 - Mean-level alignment
 - Distribution-level alignment
 
-<img src="contrastive.png" width="600"/>
+<img src="contrastive.png" width="300"/>
 Loss:
 - Contrastive loss (mean + variance)
 
